@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  bot:
+    container_name: wardes-bot
+    build:
+      context: .
+    image: wardes-bot:latest
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./:/app
+    command: ["npm", "start"]
