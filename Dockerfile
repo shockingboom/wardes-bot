@@ -47,4 +47,4 @@ EXPOSE 6666
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
 # Jalankan file JS utama
-CMD ["node", "src/index.js"]
+CMD ["node", "index.js"]
