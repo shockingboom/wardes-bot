@@ -6,8 +6,6 @@ RUN apk add --no-cache \
     freetype \
     harfbuzz \
     ca-certificates \
-    ttf-freefont \
-    wqy-zenhei \
     dumb-init
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
@@ -27,4 +25,5 @@ USER node
 EXPOSE 6666
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "index.js"]  # <-- ganti sesuai file utama kamu
+
+CMD ["node", "index.js"]
