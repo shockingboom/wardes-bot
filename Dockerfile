@@ -1,33 +1,50 @@
-FROM node:18-slim
+FROM node:20-alpine
 
-# Install dependencies required by Chromium
-RUN apt-get update && apt-get install -y \
-  wget \
-  ca-certificates \
-  fonts-liberation \
-  libappindicator3-1 \
-  libasound2 \
-  libatk-bridge2.0-0 \
-  libatk1.0-0 \
-  libcups2 \
-  libdbus-1-3 \
-  libgdk-pixbuf2.0-0 \
-  libnspr4 \
-  libnss3 \
-  libxcomposite1 \
-  libxdamage1 \
-  libxrandr2 \
-  xdg-utils \
-  libgbm1 \
-  libglib2.0-0 \
-  && rm -rf /var/lib/apt/lists/*
+# Install dependencies untuk runtime (Chromium dan font)
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto-emoji \
+    wqy-zenhei \
+    tini \
+    dumb-init
 
-# Workdir dan copy app
-WORKDIR /usr/src/app
-COPY . .
+# Set environment variables untuk Puppeteer
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    CHROME_BIN=/usr/bin/chromium-browser \
+    CHROME_PATH=/usr/lib/chromium/
 
-# Install dependencies
-RUN npm install
+# Buat user non-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
-# Start app
-CMD ["npm", "start"]
+WORKDIR /app
+
+# Copy package.json dan package-lock.json
+COPY ./package*.json ./
+
+# Install hanya dependencies production
+RUN npm install --production && \
+    npm cache clean --force
+
+# Copy seluruh source code JS
+COPY --chown=nodejs:nodejs . .
+
+# Buat direktori tambahan
+RUN mkdir -p /app/logs /app/.wwebjs_auth /app/.wwebjs_cache && \
+    chown -R nodejs:nodejs /app
+
+USER nodejs
+
+EXPOSE 6666
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+# Start aplikasi langsung dari JS
+CMD ["node", "src/index.js"]
