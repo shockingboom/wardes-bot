@@ -1,6 +1,8 @@
 "use strict";
+
 require("dotenv").config();
 require("colors");
+
 const express = require("express");
 const qr = require("qrcode-terminal");
 const { Client, LocalAuth } = require("whatsapp-web.js");
@@ -17,6 +19,9 @@ const config = {
     },
   },
 };
+
+// Variable to track client readiness
+let isClientReady = false;
 
 function formatPhoneNumber(number) {
   let formatted = number.replace(/\D/g, "");
@@ -37,8 +42,19 @@ function initializeWhatsApp() {
     console.log("QR Code generated, scan it with your phone.");
   });
 
-  client.on("authenticated", () => console.log("Authenticated successfully!"));
-  client.on("ready", () => console.log("WhatsApp client is ready!"));
+  client.on("authenticated", () => {
+    console.log("Authenticated successfully!");
+  });
+
+  client.on("ready", () => {
+    console.log("WhatsApp client is ready!");
+    isClientReady = true;
+  });
+
+  client.on("disconnected", (reason) => {
+    console.log("Client disconnected:", reason);
+    isClientReady = false;
+  });
 
   client.on("message", async (message) => {
     if (message.body === "!ping") {
@@ -50,13 +66,34 @@ function initializeWhatsApp() {
 }
 
 async function sendWhatsAppMessage(phoneNumber, message) {
+  // Check if client is ready
+  if (!isClientReady) {
+    throw new Error("WhatsApp client is not ready yet. Please wait.");
+  }
+
   const chatId = `${phoneNumber}@c.us`;
-  await client.sendMessage(chatId, message);
+  
+  // Verify number is registered on WhatsApp
+  const numberId = await client.getNumberId(chatId);
+  if (!numberId) {
+    throw new Error(`Number ${phoneNumber} is not registered on WhatsApp`);
+  }
+
+  await client.sendMessage(numberId._serialized, message);
   return { number: phoneNumber, message };
 }
 
 const app = express();
 app.use(express.json());
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    status: isClientReady ? "ready" : "not ready",
+    timestamp: new Date().toISOString(),
+  });
+});
 
 app.post("/api/send-message", async (req, res) => {
   try {
@@ -66,6 +103,13 @@ app.post("/api/send-message", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Number and message are required",
+      });
+    }
+
+    if (!isClientReady) {
+      return res.status(503).json({
+        success: false,
+        message: "WhatsApp client is not ready yet. Please try again in a few moments.",
       });
     }
 
@@ -79,7 +123,6 @@ app.post("/api/send-message", async (req, res) => {
     });
   } catch (error) {
     console.error("Error sending message:", error);
-
     res.status(500).json({
       success: false,
       message: "Failed to send message",
@@ -91,7 +134,7 @@ app.post("/api/send-message", async (req, res) => {
 (async () => {
   try {
     console.log("⚡".yellow + " Starting server...".cyan);
-
+    
     app.listen(config.SERVER.PORT, () => {
       console.log(`Server running on port ${config.SERVER.PORT}`);
     });
@@ -99,7 +142,7 @@ app.post("/api/send-message", async (req, res) => {
     console.log("📱".yellow + " Initializing WhatsApp client...".cyan);
     initializeWhatsApp();
 
-    console.log("✅ Server and WhatsApp client initialized!".green.bold);
+    console.log("✅ Server initialized! Waiting for WhatsApp client to be ready...".green.bold);
   } catch (error) {
     console.error("❌ Error starting server:".red.bold, error.message.red);
     process.exit(1);
