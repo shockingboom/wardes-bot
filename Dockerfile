@@ -26,15 +26,15 @@ RUN addgroup -g 1001 -S nodejs && \
 
 WORKDIR /app
 
-# Copy package.json dan package-lock.json
+# Copy package.json & package-lock.json
 COPY ./package*.json ./
 
-# Install hanya dependencies production
+# Install dependencies production
 RUN npm install --production && \
     npm cache clean --force
 
-# Copy seluruh source code JS
-COPY --chown=nodejs:nodejs . .
+# Copy seluruh source code termasuk src/
+COPY --chown=nodejs:nodejs ./src ./src
 
 # Buat direktori tambahan
 RUN mkdir -p /app/logs /app/.wwebjs_auth /app/.wwebjs_cache && \
@@ -46,5 +46,5 @@ EXPOSE 6666
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-# Start aplikasi langsung dari JS
+# Jalankan file JS utama
 CMD ["node", "src/index.js"]
